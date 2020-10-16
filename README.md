@@ -2,4 +2,8 @@
 
 Simple web app build with Streamlit to explore data and data visualizations for hydro applications.
 
-See the web app in action :
+See the web app in action : https://lvdlr-demostreamlit.herokuapp.com/
+
+![](img/img1.png)
+
+![](img/img2.png)
