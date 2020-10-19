@@ -17,6 +17,17 @@ utc=pytz.UTC
 
 def main():
     """Streamlit demo web app for LVDLR"""
+    
+    # Read all needed data
+    ug_filename = 'data/ss-unites-gestion.geojson'
+    map_ug = gpd.read_file(ug_filename)
+    hydro_filename = 'data/hydrographie.geojson'
+    map_hydro = gpd.read_file(hydro_filename)
+    stations_filename = 'data/stations.geojson'
+    map_stations = gpd.read_file(stations_filename)
+
+    data_qmj = get_qmj('data/hbv_qmj.csv')
+    data_qi = get_qi('data/hbv_qi.csv')
 
     # Initiate useful variables
     river_theme_color = ['#57A0D3', '#4F97A3', '#7285A5', '#73C2FB', '#008081', '#4C516D', '#6593F5', '#008ECC', '#95C8D8', '#4682B4', '#0F52BA', '#0080FF']
@@ -49,18 +60,7 @@ def main():
         'Célé': cele
     }
 
-    qi_stations = ['CAHEDF','COUTET','D_GANIVET','D_MOULINET','ENTEDF','GOUL','NAT_O77015','O6140010','O7041510','O7054010','O7074020','O7094010','O7101510','O7145220','O7161510_E','O7191510','O7202510','O7234010','O7234030','O7245010','O7265010','O7272510','O7354010','O7410401','O7434010','O7444010','O7515510','O7535010','O7635010','O7701540','O7874010','O7944020','O7971510','O8113520','O8133520','O8231530','O8255010','O8264010','O8344020','O8661510','O8661520','O9000010']
-
-    # Read all needed data
-    ug_filename = 'data/ss-unites-gestion.geojson'
-    map_ug = gpd.read_file(ug_filename)
-    hydro_filename = 'data/hydrographie.geojson'
-    map_hydro = gpd.read_file(hydro_filename)
-    stations_filename = 'data/stations.geojson'
-    map_stations = gpd.read_file(stations_filename)
-
-    data_qmj = get_qmj('data/hbv_qmj.csv')
-    data_qi = get_qi('data/hbv_qi.csv')
+    qi_stations = data_qi['code_station'].unique()
 
     # Explore Qmj data
     '# La Vie De La Rivière'
