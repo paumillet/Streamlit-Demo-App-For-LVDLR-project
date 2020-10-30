@@ -61,11 +61,11 @@ def get_station_status(qmj, doe, da, dar, dcr):
     return 0
 
 
-def get_hydro_status(id_hydro, map_stations):
-    return map_stations['status'].loc[map_stations['ID_hydrographie']==id_hydro].max()
+def get_hydro_status(id_hydro, map_stations_status, map_station_hydro):
+    return map_stations_status.loc[map_station_hydro==id_hydro].max()
 
-def get_ug_status(id_ug, map_hydro):
-    return map_hydro['status'].loc[map_hydro['ID_ss-unite-gestion']==id_ug].max()
+def get_ug_status(id_ug, map_hydro_status, map_hydro_ug):
+    return map_hydro_status.loc[map_hydro_ug==id_ug].max()
 
 
 def get_status_color(status, t=None):
