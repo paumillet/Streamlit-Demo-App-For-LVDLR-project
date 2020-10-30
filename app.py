@@ -36,7 +36,14 @@ def main():
     # Initiate useful variables
     river_theme_color = ['#57A0D3', '#4F97A3', '#7285A5', '#73C2FB', '#008081', '#4C516D', '#6593F5', '#008ECC', '#95C8D8', '#4682B4', '#0F52BA', '#0080FF']
 
-    threshold_colors=['#88CE33','#F5DC0B','#F5860B','#E53E1D', '#000000', '#efefef']
+    threshold_colors=['#828282', '#88CE33','#F5DC0B','#F5860B','#E53E1D', '#000000']
+
+    threshold_value_dict = {
+        'DOE': 2,
+        'DA': 3,
+        'DAR': 4,
+        'DC': 5
+    }
 
     threshold_value_dict = {
         'DOE': 2,
@@ -65,6 +72,8 @@ def main():
     }
 
     qi_stations = data_qi['code_station'].unique()
+
+    stations_qmj_list = ['O6140010','O9000010','O8584010','O8394310','O8344020','O8255010','O8264010','O8113520','O8133520','O7434010','O7354010','O7635010','O7265010','O7234030','O7234010','O7272510','O7202510','O7410401','O7444010','O7245010','GOUL','O7515510','O7535010','O7094010','O7054010','O7074020','O7085010','O7874010','O7825010','O7944020','O7145220','O7035010','O7001510','O7041510','O7101510','O7191510','O7161510_E','O7021530','O7015810','O8661520','COUTET','CAHEDF','O8231530','ENTEDF','O7701540','O7971510']
 
     # Explore Qmj data
     marginleft, contentcol, marginright = st.beta_columns([1,13,1])
@@ -142,7 +151,7 @@ Explorateur des données des rivières du bassin du Lot
                 as_=['variable', 'value']
             ).mark_rule().encode(
                 y='value:Q',
-                color=alt.Color('variable:N', legend=alt.Legend(title='Débits seuils'), scale=alt.Scale(domain=['DOE', 'DA', 'DAR', 'DC'],range=threshold_colors))
+                color=alt.Color('variable:N', legend=alt.Legend(title='Débits seuils'), scale=alt.Scale(domain=['DOE', 'DA', 'DAR', 'DC'],range=threshold_colors[1:]))
             )
 
             ### Agregate Line chart and horizontal lines into one single chart
@@ -211,23 +220,37 @@ Explorateur des données des rivières du bassin du Lot
     reshape_data = pd.concat(frames, axis=1)
 
     ## Concat stations with their corresponding qmj
-    map_stations = pd.concat([map_stations.set_index('COD_STAT'),reshape_data.loc[date_qmj][['O6140010','O9000010','O8584010','O8394310','O8344020','O8255010','O8264010','O8113520','O8133520','O7434010','O7354010','O7635010','O7265010','O7234030','O7234010','O7272510','O7202510','O7410401','O7444010','O7245010','GOUL','O7515510','O7535010','O7094010','O7054010','O7074020','O7085010','O7874010','O7825010','O7944020','O7145220','O7035010','O7001510','O7041510','O7101510','O7191510','O7161510_E','O7021530','O7015810','O8661520','COUTET','CAHEDF','O8231530','ENTEDF','O7701540','O7971510']].round(4)], axis=1).rename(columns={date_qmj: "qmj_selected"})
+    rename_col_dict = {
+        date_qmj: date_qmj.strftime('%_d/%m/%Y'),
+        date_qmj-timedelta(1): (date_qmj-timedelta(1)).strftime('%_d/%m/%Y'),
+        date_qmj-timedelta(2): (date_qmj-timedelta(2)).strftime('%_d/%m/%Y'),
+        date_qmj-timedelta(3): (date_qmj-timedelta(3)).strftime('%_d/%m/%Y'),
+        date_qmj-timedelta(4): (date_qmj-timedelta(4)).strftime('%_d/%m/%Y'),
+        date_qmj-timedelta(5): (date_qmj-timedelta(5)).strftime('%_d/%m/%Y'),
+        date_qmj-timedelta(6): (date_qmj-timedelta(6)).strftime('%_d/%m/%Y'),
+    }
 
+    map_stations = pd.concat([map_stations.set_index('COD_STAT'),reshape_data.loc[[date_qmj-timedelta(d) for d in range(0,7)]][stations_qmj_list].T.round(4)], axis=1).rename(columns=rename_col_dict) #pd.concat([map_stations.set_index('COD_STAT'),reshape_data.loc[date_qmj][stations_qmj_list].round(4)], axis=1).rename(columns={date_qmj: "qmj_selected"})
+    
     ## Compute status given the qmj and the corresponding flow thresholds
-    ### For stations
-    map_stations['status'] = [get_station_status(row[0], row[1], row[2], row[3], row[4]) for row in map_stations[['qmj_selected', 'Q_Obj_m3', 'Q_80pDOE_m3', 'Q_alerte_renf', 'Q_Crise_m3']].to_numpy()]
+    
+    for d in range(0,7):
+        dd = date_qmj-timedelta(d)
 
-    ### For hydro
-    map_hydro['status'] = [get_hydro_status(x, map_stations) for x in map_hydro['ID_hydrographie']]
+        ### For stations
+        map_stations[f"{dd.strftime('%_d/%m/%Y')}-status"] = [get_station_status(row[0], row[1], row[2], row[3], row[4]) for row in map_stations[[f"{dd.strftime('%_d/%m/%Y')}", 'Q_Obj_m3', 'Q_80pDOE_m3', 'Q_alerte_renf', 'Q_Crise_m3']].to_numpy()]
 
-    ### For management units
-    map_ug['status'] = [get_ug_status(x, map_hydro) for x in map_ug['ID_ss-unite-gestion']]
+        ### For hydro
+        map_hydro[f"{dd.strftime('%_d/%m/%Y')}-status"] = [get_hydro_status(x, map_stations[f"{dd.strftime('%_d/%m/%Y')}-status"], map_stations['ID_hydrographie']) for x in map_hydro['ID_hydrographie']]
 
+        ### For management units
+        map_ug[f"{dd.strftime('%_d/%m/%Y')}-status"] = [get_ug_status(x, map_hydro[f"{dd.strftime('%_d/%m/%Y')}-status"], map_hydro['ID_ss-unite-gestion']) for x in map_ug['ID_ss-unite-gestion']]
+    
     ## Associate color to the status
-    map_stations['color'] = map_stations['status'].apply(get_status_color)
-    map_stations['color_stroke'] = [get_status_color(x, 'hydro') for x in map_stations['status']]
-    map_hydro['color'] = [get_status_color(x, 'hydro') for x in map_hydro['status']]
-    map_ug['color'] = [get_status_color(x, 'ug') for x in map_ug['status']]
+    map_stations['color'] = map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"].apply(get_status_color)
+    map_stations['color_stroke'] = [get_status_color(x, 'hydro') for x in map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]]
+    map_hydro['color'] = [get_status_color(x, 'hydro') for x in map_hydro[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]]
+    map_ug['color'] = [get_status_color(x, 'ug') for x in map_ug[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]]
 
     map_stations.reset_index(inplace=True)
 
@@ -243,7 +266,8 @@ Explorateur des données des rivières du bassin du Lot
         with st.beta_expander(f"Voir le débit moyen pour les stations sélectionnées au {date_qmj.strftime('%_d/%m/%Y')}"):
             for station in selected_stations:
                 value = reshape_data.loc[date_qmj][station].round(4)
-                st.markdown(f"à la station {station} : **<span style='color: red'>{value}</span>** m3",unsafe_allow_html=True)
+                col = threshold_colors[map_stations.loc[map_stations['index']==station][f"{date_qmj.strftime('%_d/%m/%Y')}-status"].iloc[0]]
+                st.markdown(f"à la station {station} : **<span style='color: {col}'>{value}</span>** m3",unsafe_allow_html=True)
     ## Map Data
     ## Get the center of the map given the spatial repartition of the hydrometry
     bbox = map_hydro.total_bounds
@@ -254,7 +278,7 @@ Explorateur des données des rivières du bassin du Lot
     "html": """
     <p style="font-size:15px">
     {index} <b>{NOM_COMPLET}</b> <br>
-    Qmj du jour : {qmj_selected} m3 <br>
+    Qmj du jour : {date_qmj} m3 <br>
     </p>
     <p style="font-size:10px">
     DOE : {Q_Obj_m3} m3 &nbsp;
@@ -324,11 +348,40 @@ Explorateur des données des rivières du bassin du Lot
             options=['DOE', 'DA', 'DAR', 'DC']
             )
 
-    threshold_table = map_stations[map_stations['status']>=threshold_value_dict[threshold]][['index','NOM_COMPLET','qmj_selected',threshold_name_dict[threshold],'hydrographie','UG','Unite_Gestion']].rename(columns={'NOM_COMPLET': 'nom complet','qmj_selected': f'QMJ {date_qmj} [m3]', threshold_name_dict[threshold]: f'{threshold} [m3]','Unite_Gestion': 'unité de gestion'}).set_index('index')
+    threshold_table = map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]>=threshold_value_dict[threshold]][['index','NOM_COMPLET',f"{date_qmj.strftime('%_d/%m/%Y')}",threshold_name_dict[threshold],'hydrographie','UG','Unite_Gestion']].rename(columns={'NOM_COMPLET': 'nom complet',f"{date_qmj.strftime('%_d/%m/%Y')}": f'QMJ {date_qmj} [m3]', threshold_name_dict[threshold]: f'{threshold} [m3]','Unite_Gestion': 'unité de gestion'}).set_index('index')
+
+    source = pd.DataFrame(columns=['stations', 'day', 'status'])
+    
+    for row in map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]>=threshold_value_dict[threshold]].itertuples(index=False):
+        for i in range(0,7):
+            source = source.append({'stations': row[0], 'day': date_qmj-timedelta(i), 'status': row[i+28]}, ignore_index=True)
+
+    heatmap = alt.Chart(
+        source,
+        title="Tableau de franchissement des débits seuils"
+    ).mark_square(size=400).encode(
+        x=alt.X('day:T', scale=alt.Scale(domain=((date_qmj-timedelta(7.25)).strftime('%Y-%m-%d'), (date_qmj+timedelta(1)).strftime('%Y-%m-%d')))),
+        y='stations:N',
+        color=alt.Color('status:O', legend=alt.Legend(title='Débits seuils franchis'), scale=alt.Scale(domain=['0','1', '2', '3', '4', '5'], range=['#828282', '#88CE33','#F5DC0B','#F5860B','#E53E1D', '#000000'])),
+        tooltip=[
+            alt.Tooltip('stations:N', title='Station'),
+            alt.Tooltip('day:T', title='Date'),
+            alt.Tooltip('status:Q', title='Status'),
+        ]
+    ).properties(
+        width=430,
+        height=len(source['stations'].unique())*25+70
+    ).configure_axis(
+        grid=False
+    ).configure_view(
+        strokeWidth=0
+    )
+
+    
 
     with col_display_table:
-        if len(threshold_table)>0:
-            st.table(threshold_table)
+        if len(source)>0:
+            st.altair_chart(heatmap)
         else:
             st.write(f"*Aucune station sous le {threshold}*")
 
@@ -339,7 +392,7 @@ Explorateur des données des rivières du bassin du Lot
         '### Visualisations combinées'
         scale = alt.Scale(domain=['0','1', '2', '3', '4', '5'],
                         range=['#828282', '#88CE33','#F5DC0B','#F5860B','#E53E1D', '#000000'])
-        color = alt.Color('status:N', scale=scale)
+        color = alt.Color(f"{date_qmj.strftime('%_d/%m/%Y')}-status:N", scale=scale)
 
         ## We create two selections:
         ## - a brush that is active on the top panel
@@ -352,8 +405,8 @@ Explorateur des données des rivières du bassin du Lot
             alt.X('X_LONG_E:Q', title='Longitude'),
             alt.Y('Y_LAT_N:Q', title='Latitude', scale=alt.Scale(domain=[bbox[1]-0.05,bbox[3]+0.05])),
             color=alt.condition(brush, color, alt.value('lightgray')),
-            size=alt.Size('qmj_selected:Q', scale=alt.Scale(range=[20, 300])),
-            tooltip=['index','qmj_selected'],
+            size=alt.Size(f"{date_qmj.strftime('%_d/%m/%Y')}:Q", scale=alt.Scale(range=[20, 300])),
+            tooltip=['index',f"{date_qmj.strftime('%_d/%m/%Y')}"],
         ).properties(
             width=550,
             height=300
@@ -366,7 +419,7 @@ Explorateur des données des rivières du bassin du Lot
         ## Bottom panel is a bar chart giving the distibution of the stations according to their status
         bars = alt.Chart().mark_bar().encode(
             x=alt.X('count()', title='Nombre de stations par intervalle de seuils'),
-            y=alt.Y('status:N', scale=alt.Scale(domain=[0, 1, 2, 3, 4, 5]), title='Seuils'),
+            y=alt.Y(f"{date_qmj.strftime('%_d/%m/%Y')}-status:N", scale=alt.Scale(domain=[0, 1, 2, 3, 4, 5]), title='Seuils'),
             color=alt.condition(click, color, alt.value('lightgray')),
         ).transform_filter(
             brush
@@ -399,8 +452,8 @@ Explorateur des données des rivières du bassin du Lot
             alt.X('river_name:O', title='Rivières', axis=alt.Axis(labelAngle=0, orient="top")),
             alt.Y('index:O', title=''),
             color=color,
-            size=alt.Size('qmj_selected:Q', scale=alt.Scale(range=[20, 500])),
-            tooltip=['COD_STAT','qmj_selected'],
+            size=alt.Size(f"{date_qmj.strftime('%_d/%m/%Y')}:Q", scale=alt.Scale(range=[20, 500])),
+            tooltip=['COD_STAT',f"{date_qmj.strftime('%_d/%m/%Y')}"],
         ).properties(
             height=400
         )
@@ -412,12 +465,12 @@ Explorateur des données des rivières du bassin du Lot
         # Not available with Altair so this one is a try with Bokeh
         '### Pie Chart'
         data_pie = {
-            'Au-dessus DOE': len(map_stations[map_stations.status==1]),
-            'Sous DOE': len(map_stations[map_stations.status==2]),
-            'Sous DA': len(map_stations[map_stations.status==3]),
-            'Sous DAR': len(map_stations[map_stations.status==4]),
-            'Sous DC': len(map_stations[map_stations.status==5]),
-            'Sans information': len(map_stations[map_stations.status==0])
+            'Sans information': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==0]),
+            'Au-dessus DOE': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==1]),
+            'Sous DOE': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==2]),
+            'Sous DA': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==3]),
+            'Sous DAR': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==4]),
+            'Sous DC': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==5])
         }
 
 
