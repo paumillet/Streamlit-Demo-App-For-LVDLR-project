@@ -72,21 +72,32 @@ def main():
     }
 
     qi_stations = data_qi['code_station'].unique()
+    qmj_stations = data_qmj['code_station'].unique()
 
     stations_qmj_list = ['O6140010','O9000010','O8584010','O8394310','O8344020','O8255010','O8264010','O8113520','O8133520','O7434010','O7354010','O7635010','O7265010','O7234030','O7234010','O7272510','O7202510','O7410401','O7444010','O7245010','GOUL','O7515510','O7535010','O7094010','O7054010','O7074020','O7085010','O7874010','O7825010','O7944020','O7145220','O7035010','O7001510','O7041510','O7101510','O7191510','O7161510_E','O7021530','O7015810','O8661520','COUTET','CAHEDF','O8231530','ENTEDF','O7701540','O7971510']
 
-    # Explore Qmj data
+    # Select variable to visualize
     marginleft, contentcol, marginright = st.beta_columns([1,13,1])
     with contentcol:
         """# La Vie De La Rivière
 Explorateur des données des rivières du bassin du Lot
         """
+    
+        var_type = st.radio('Sélectionnez la variable à visualiser', ['Débit moyen journalier (Qmj)', 'Débit instantané (Qi)'])
 
+        if var_type == 'Débit moyen journalier (Qmj)':
+            title = 'Débit moyen journalier'
+            data = data_qmj.copy()
+        elif var_type == 'Débit instantané (Qi)':
+            title = 'Débit instantané'
+            data = data_qi.copy()
+
+    # Explore Qmj data
     marginleft, col_select_qmj, marginmiddle, col_display_qmj, marginright = st.beta_columns([1,3,1,9,1])
     
     with col_select_qmj:
         ## Select Qmj stations for visualization
-        stations = data_qmj['code_station'].unique()
+        stations = data['code_station'].unique()
         selected_stations = st.multiselect('Sélectionnez une ou plusieurs stations', stations)
 
         if not selected_stations:
@@ -94,13 +105,12 @@ Explorateur des données des rivières du bassin du Lot
             st.stop()
 
         ## Subset data for selected stations
-        data_qmj_selected = data_qmj.copy()
-        data_qmj_selected = data_qmj_selected.loc[data_qmj_selected['code_station'].isin(selected_stations)]
+        data = data.loc[data['code_station'].isin(selected_stations)]
 
         ## Display sliders to filter data subset
         ### Flow slider
-        min_flow = int(data_qmj_selected['debit'].min().round())
-        max_flow = int(data_qmj_selected['debit'].max().round()+1)
+        min_flow = int(data['debit'].min().round())
+        max_flow = int(data['debit'].max().round()+1)
         flow_slider = st.slider(
             'Intervalle de débits à visualiser [m3]',
             min_value=min_flow,
@@ -109,8 +119,12 @@ Explorateur des données des rivières du bassin du Lot
             )
 
         ### Date slider
-        min_date = data_qmj_selected['date'].min()
-        max_date = data_qmj_selected['date'].max()
+        min_date = data['date'].min()
+        max_date = data['date'].max()
+
+        if var_type == 'Débit instantané (Qi)':
+            max_date = date(max_date.year, max_date.month, max_date.day)
+            min_date = date(min_date.year, min_date.month, min_date.day)
 
         date_slider = st.slider(
             'Intervalle de dates à visualiser',
@@ -137,7 +151,7 @@ Explorateur des données des rivières du bassin du Lot
                 opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
                 tooltip=['code_station','debit']
             ).properties(
-                title='Débit moyen journalier'
+                title=title
             ).add_selection(
                 selection
             )
@@ -154,7 +168,7 @@ Explorateur des données des rivières du bassin du Lot
             ### Agregate Line chart and horizontal lines into one single chart
             qmj_all = alt.layer(
                 qmj_line, aggregates,
-                data=data_qmj_selected
+                data=data
             ).transform_calculate(
                 DOE=f"{DOE}",
                 DA=f"{DA}",
@@ -173,13 +187,13 @@ Explorateur des données des rivières du bassin du Lot
                 opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
                 tooltip=['code_station','debit']
             ).properties(
-                title='Débit moyen journalier'
+                title=title
             ).add_selection(
                 selection
             )
             qmj_all = alt.layer(
                 qmj_line,
-                data=data_qmj_selected
+                data=data
             ).interactive().properties(
                 height=500
             )
@@ -193,11 +207,11 @@ Explorateur des données des rivières du bassin du Lot
         with st.beta_expander("Voir les données brutes"):
             st.subheader(f'Données de débit moyen journalier (Qmj), {print_stations(selected_stations)}')
             ### Reshape data to ease raw data visualization
-            frames = [process_stations(station, data_qmj_selected) for station in selected_stations]
-            data_qmj_selected_viz = pd.concat(frames, axis=1)
+            frames = [process_stations(station, data) for station in selected_stations]
+            data_selected_viz = pd.concat(frames, axis=1)
 
             ### and display
-            data_qmj_selected_viz
+            data_selected_viz
 
 
         # Overview of the watershed at a given date
@@ -207,13 +221,16 @@ Explorateur des données des rivières du bassin du Lot
 
     with col_select:
         ## Select the day of visualization
+        value_date_input = date_slider[1]
+        if value_date_input>data_qmj['date'].max():
+            value_date_input = data_qmj['date'].max()
         date_qmj = st.date_input(
             'Choisir une date',
-            value=date_slider[1]
+            value=value_date_input
             )
 
     ## Reshape data to ease qmj selection
-    frames = [process_stations(station, data_qmj) for station in stations]
+    frames = [process_stations(station, data_qmj) for station in qmj_stations]
     reshape_data = pd.concat(frames, axis=1)
 
     ## Concat stations with their corresponding qmj
@@ -227,10 +244,9 @@ Explorateur des données des rivières du bassin du Lot
         date_qmj-timedelta(6): (date_qmj-timedelta(6)).strftime('%_d/%m/%Y'),
     }
 
-    map_stations = pd.concat([map_stations.set_index('COD_STAT'),reshape_data.loc[[date_qmj-timedelta(d) for d in range(0,7)]][stations_qmj_list].T.round(4)], axis=1).rename(columns=rename_col_dict) #pd.concat([map_stations.set_index('COD_STAT'),reshape_data.loc[date_qmj][stations_qmj_list].round(4)], axis=1).rename(columns={date_qmj: "qmj_selected"})
+    map_stations = pd.concat([map_stations.set_index('COD_STAT'),reshape_data.loc[[date_qmj-timedelta(d) for d in range(0,7)]][stations_qmj_list].T.round(4)], axis=1).rename(columns=rename_col_dict)
     
     ## Compute status given the qmj and the corresponding flow thresholds
-    
     for d in range(0,7):
         dd = date_qmj-timedelta(d)
 
@@ -455,106 +471,54 @@ Explorateur des données des rivières du bassin du Lot
         ## and display
         st.altair_chart(river_chart, use_container_width=True)
 
-        # Pie chart are useful for global overview of share
-        # Not available with Altair so this one is a try with Bokeh
-        '### Pie Chart'
-        data_pie = {
-            'Sans information': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==0]),
-            'Au-dessus DOE': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==1]),
-            'Sous DOE': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==2]),
-            'Sous DA': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==3]),
-            'Sous DAR': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==4]),
-            'Sous DC': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==5])
-        }
+        # # Pie chart are useful for global overview of share
+        # # Not available with Altair so this one is a try with Bokeh
+        # # Not displayed for the moment
+        # '### Pie Chart'
+        # data_pie = {
+        #     'Sans information': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==0]),
+        #     'Au-dessus DOE': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==1]),
+        #     'Sous DOE': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==2]),
+        #     'Sous DA': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==3]),
+        #     'Sous DAR': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==4]),
+        #     'Sous DC': len(map_stations[map_stations[f"{date_qmj.strftime('%_d/%m/%Y')}-status"]==5])
+        # }
 
 
-        data_pie = pd.Series(data_pie).reset_index(name='value').rename(columns={'index':'categorie'})
-        data_pie['angle'] = data_pie['value']/data_pie['value'].sum() * 2*pi
-        data_pie['color'] = threshold_colors
+        # data_pie = pd.Series(data_pie).reset_index(name='value').rename(columns={'index':'categorie'})
+        # data_pie['angle'] = data_pie['value']/data_pie['value'].sum() * 2*pi
+        # data_pie['color'] = threshold_colors
 
-        p = figure(plot_height=350, toolbar_location=None,
-                tools="hover", tooltips="@categorie: @value", x_range=(-0.5, 1.0))
+        # p = figure(plot_height=350, toolbar_location=None,
+        #         tools="hover", tooltips="@categorie: @value", x_range=(-0.5, 1.0))
 
-        p.wedge(x=0, y=1, radius=0.4,
-                start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
-                line_color="white", fill_color='color', legend_field='categorie', source=data_pie)
+        # p.wedge(x=0, y=1, radius=0.4,
+        #         start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
+        #         line_color="white", fill_color='color', legend_field='categorie', source=data_pie)
 
-        p.axis.axis_label=None
-        p.axis.visible=False
-        p.grid.grid_line_color = None
+        # p.axis.axis_label=None
+        # p.axis.visible=False
+        # p.grid.grid_line_color = None
 
-        st.bokeh_chart(p)
+        # st.bokeh_chart(p)
 
 
+    ## This code is not useful anymore but kept here, in case it's needed again
+    # max_date_qi = st.date_input('Sélectionner la date de fin de la visualisation', min_value=data_qi_selected['date'].min().date(), max_value=data_qi_selected['date'].max().date())
+    # delta = st.radio("Choisir une période de visualisation",options=["7 jours", "15 jours", "1 mois", "2 mois", "3 mois"])
+    # delta_dict = {
+    #     "7 jours": 7,
+    #     "15 jours": 15,
+    #     "1 mois": 30,
+    #     "2 mois": 60,
+    #     "3 mois": 90
+    # }
 
-        # Visualize Qi data
-        # It's the exact same approach as with Qmj
-        "# Visualiser les débits instantanés Qi"
+    # date_slider_qi = [max_date_qi-timedelta(delta_dict[delta]), max_date_qi]
 
-    marginleft, col_select, marginmiddle, col_display_qi, marginright = st.beta_columns([1,3,1,9,1])
+    # date_slider_qi0 = utc.localize(datetime.fromtimestamp(mktime(date_slider_qi[0].timetuple())))
+    # date_slider_qi1 = utc.localize(datetime.fromtimestamp(mktime(date_slider_qi[1].timetuple())))
 
-    with col_select:
-        selected_qi_stations = st.multiselect("Choisir une station",options=qi_stations)
-
-        if not selected_qi_stations:
-            st.warning('Renseignez au moins une station.')
-            st.stop()
-
-        data_qi_selected = data_qi.copy()
-        data_qi_selected = data_qi_selected.loc[data_qi_selected['code_station'].isin(selected_qi_stations)]
-        min_flow_qi = int(data_qi_selected['debit'].min().round())
-        max_flow_qi = int(data_qi_selected['debit'].max().round()+1)
-        flow_slider_qi = st.slider(
-            'Intervalle de débits à visualiser [m3]',
-            min_value=min_flow_qi,
-            max_value=max_flow_qi, 
-            value=(min_flow_qi, max_flow_qi)
-            )
-
-        max_date_qi = st.date_input('Sélectionner la date de fin de la visualisation', min_value=data_qi_selected['date'].min().date(), max_value=data_qi_selected['date'].max().date())
-        delta = st.radio("Choisir une période de visualisation",options=["7 jours", "15 jours", "1 mois", "2 mois", "3 mois"])
-        delta_dict = {
-            "7 jours": 7,
-            "15 jours": 15,
-            "1 mois": 30,
-            "2 mois": 60,
-            "3 mois": 90
-        }
-
-    with col_display_qi:
-        date_slider_qi = [max_date_qi-timedelta(delta_dict[delta]), max_date_qi]
-
-        date_slider_qi0 = utc.localize(datetime.fromtimestamp(mktime(date_slider_qi[0].timetuple())))
-        date_slider_qi1 = utc.localize(datetime.fromtimestamp(mktime(date_slider_qi[1].timetuple())))
-
-        chart_data_qi = data_qi_selected.copy()
-        chart_data_qi = chart_data_qi.drop(columns=['code_station']).set_index('date').rename(columns={'debit':'Qi [m3]'})
-
-        frames_qi = [process_stations(station, data_qi) for station in selected_qi_stations]
-        chart_data_qi = pd.concat(frames_qi, axis=1)
-
-        qi_line = alt.Chart(data_qi_selected).mark_line().encode(
-                x=alt.X('date:T', axis=alt.Axis(domain=False, format='%_d/%m/%Y'), title=None, scale=alt.Scale(domain=(date_slider_qi0.strftime('%Y-%m-%d'), date_slider_qi1.strftime('%Y-%m-%d')))),
-                y=alt.Y('debit:Q', title='débit [m3]', scale=alt.Scale(domain=(flow_slider_qi[0], flow_slider_qi[1]))),
-                color=alt.Color('code_station:N', title='Code station', scale=alt.Scale(domain=selected_qi_stations,range=river_theme_color)),
-                opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
-                tooltip=['code_station','debit']
-            ).properties(
-                title='Débit instantané'
-            ).add_selection(
-                selection
-            ).interactive().properties(
-                height=500,
-            )
-       
-        st.altair_chart(qi_line, use_container_width=True)
-
-    marginleft, contentcol, marginright = st.beta_columns([1,13,1])
-
-    with contentcol:
-        with st.beta_expander("Voir les données brutes de Qi"):
-            st.subheader(f'Données de débits instantanés, {print_stations(selected_qi_stations)}')
-            chart_data_qi
 
 
 if __name__ == "__main__":
