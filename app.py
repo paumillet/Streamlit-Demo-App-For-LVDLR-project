@@ -527,8 +527,6 @@ Explorateur des données des rivières du bassin du Lot
         date_slider_qi0 = utc.localize(datetime.fromtimestamp(mktime(date_slider_qi[0].timetuple())))
         date_slider_qi1 = utc.localize(datetime.fromtimestamp(mktime(date_slider_qi[1].timetuple())))
 
-        data_qi_selected = data_qi_selected.loc[(data_qi_selected['debit']>=flow_slider_qi[0]) & (data_qi_selected['debit']<flow_slider_qi[1]) & (data_qi_selected['date']>=date_slider_qi0) & (data_qi_selected['date']<date_slider_qi1)]
-
         chart_data_qi = data_qi_selected.copy()
         chart_data_qi = chart_data_qi.drop(columns=['code_station']).set_index('date').rename(columns={'debit':'Qi [m3]'})
 
@@ -536,8 +534,8 @@ Explorateur des données des rivières du bassin du Lot
         chart_data_qi = pd.concat(frames_qi, axis=1)
 
         qi_line = alt.Chart(data_qi_selected).mark_line().encode(
-                x=alt.X('date:T', axis=alt.Axis(domain=False, format='%_d/%m/%Y'), title=None),
-                y=alt.Y('debit:Q', title='débit [m3]'),
+                x=alt.X('date:T', axis=alt.Axis(domain=False, format='%_d/%m/%Y'), title=None, scale=alt.Scale(domain=(date_slider_qi0.strftime('%Y-%m-%d'), date_slider_qi1.strftime('%Y-%m-%d')))),
+                y=alt.Y('debit:Q', title='débit [m3]', scale=alt.Scale(domain=(flow_slider_qi[0], flow_slider_qi[1]))),
                 color=alt.Color('code_station:N', title='Code station', scale=alt.Scale(domain=selected_qi_stations,range=river_theme_color)),
                 opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
                 tooltip=['code_station','debit']
@@ -548,8 +546,7 @@ Explorateur des données des rivières du bassin du Lot
             ).interactive().properties(
                 height=500,
             )
-        
-        
+       
         st.altair_chart(qi_line, use_container_width=True)
 
     marginleft, contentcol, marginright = st.beta_columns([1,13,1])
