@@ -120,10 +120,6 @@ Explorateur des données des rivières du bassin du Lot
             format="DD/MM/YYYY"
             )
 
-        ### Filter data given sliders values
-        data_qmj_selected = data_qmj_selected.loc[(data_qmj_selected['debit']>=flow_slider[0]) & (data_qmj_selected['debit']<flow_slider[1]) & (data_qmj_selected['date']>=date_slider[0]) & (data_qmj_selected['date']<=date_slider[1])]
-
-
     ## Display qmj data in line chart
     with col_display_qmj:
         ### Allow legend filter
@@ -135,10 +131,11 @@ Explorateur des données des rivières du bassin du Lot
         if len(selected_stations) == 1 and not np.isnan(DOE):
             ### Line chart of flow
             qmj_line = alt.Chart().mark_line().encode(
-                x=alt.X('date:T', axis=alt.Axis(domain=False, format='%_d/%m/%Y'), title=None),
-                y=alt.Y('debit:Q', title='débit [m3]'),
+                x=alt.X('date:T', axis=alt.Axis(domain=False, format='%_d/%m/%Y'), title=None, scale=alt.Scale(domain=(date_slider[0].strftime('%Y-%m-%d'), date_slider[1].strftime('%Y-%m-%d')))),
+                y=alt.Y('debit:Q', title='débit [m3]', scale=alt.Scale(domain=(flow_slider[0], flow_slider[1]))),
                 color=alt.value('#57A0D3'),
-                opacity=alt.condition(selection, alt.value(1), alt.value(0.1))
+                opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
+                tooltip=['code_station','debit']
             ).properties(
                 title='Débit moyen journalier'
             ).add_selection(
@@ -170,8 +167,8 @@ Explorateur des données des rivières du bassin du Lot
         else:
             ### If ther more than one station selected, only display flow values
             qmj_line = alt.Chart().mark_line().encode(
-                x=alt.X('date:T', axis=alt.Axis(domain=False, format='%_d/%m/%Y'), title=None),
-                y=alt.Y('debit:Q', title='débit [m3]'),
+                x=alt.X('date:T', axis=alt.Axis(domain=False, format='%_d/%m/%Y'), title=None, scale=alt.Scale(domain=(date_slider[0].strftime('%Y-%m-%d'), date_slider[1].strftime('%Y-%m-%d')))),
+                y=alt.Y('debit:Q', title='débit [m3]', scale=alt.Scale(domain=(flow_slider[0], flow_slider[1]))),
                 color=alt.Color('code_station:N', title='Code station', scale=alt.Scale(domain=selected_stations,range=river_theme_color)),
                 opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
                 tooltip=['code_station','debit']
@@ -356,10 +353,7 @@ Explorateur des données des rivières du bassin du Lot
         for i in range(0,7):
             source = source.append({'stations': row[0], 'day': date_qmj-timedelta(i), 'status': row[i+28]}, ignore_index=True)
 
-    heatmap = alt.Chart(
-        source,
-        title="Tableau de franchissement des débits seuils"
-    ).mark_square(size=400).encode(
+    heatmap = alt.Chart(source).mark_square(size=400).encode(
         x=alt.X('day:T', scale=alt.Scale(domain=((date_qmj-timedelta(7.25)).strftime('%Y-%m-%d'), (date_qmj+timedelta(1)).strftime('%Y-%m-%d')))),
         y='stations:N',
         color=alt.Color('status:O', legend=alt.Legend(title='Débits seuils franchis'), scale=alt.Scale(domain=['0','1', '2', '3', '4', '5'], range=['#828282', '#88CE33','#F5DC0B','#F5860B','#E53E1D', '#000000'])),
@@ -370,7 +364,7 @@ Explorateur des données des rivières du bassin du Lot
         ]
     ).properties(
         width=430,
-        height=len(source['stations'].unique())*25+70
+        height=len(source['stations'].unique())*25+60
     ).configure_axis(
         grid=False
     ).configure_view(
